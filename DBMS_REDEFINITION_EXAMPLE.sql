@@ -1,0 +1,155 @@
+
+-- VALIDO si puedo redefinir
+BEGIN
+  DBMS_REDEFINITION.CAN_REDEF_TABLE('HLEBA750','TRANSACCIONES',
+      DBMS_REDEFINITION.CONS_USE_PK);
+END;
+/
+
+-- Creo la tabla como la necesito
+
+CREATE TABLE HLEBA750.TRANSACCIONES_INTERMIN
+(
+  ID                     NUMBER,
+  ID_AFILIACION          NUMBER                 NOT NULL,
+  ID_TERMINAL            NUMBER                 NOT NULL,
+  ID_AUTORIZADOR         NUMBER(2)              NOT NULL,
+  ID_USR_TRANS           NUMBER,
+  TIPO_TRANS             CHAR(3 BYTE)           NOT NULL,
+  MODO                   CHAR(3 BYTE)           NOT NULL,
+  FECHA_RECEP_CTE        TIMESTAMP(6)           NOT NULL,
+  FECHA_ENVIO_AUT        TIMESTAMP(6),
+  FECHA_RECEP_AUT        TIMESTAMP(6),
+  FECHA_ENVIO_CTE        TIMESTAMP(6),
+  REFERENCIA             VARCHAR2(16 BYTE)      NOT NULL,
+  REF_AUTORIZADOR        VARCHAR2(50 BYTE),
+  NUMERO_CONTROL         VARCHAR2(30 BYTE)      NOT NULL,
+  REF_CLIENTE1           VARCHAR2(30 BYTE),
+  REF_CLIENTE2           VARCHAR2(30 BYTE),
+  REF_CLIENTE3           VARCHAR2(30 BYTE),
+  REF_CLIENTE4           VARCHAR2(30 BYTE),
+  REF_CLIENTE5           VARCHAR2(30 BYTE),
+  IND_SUSPENSION         CHAR(1 BYTE),
+  MONTO                  NUMBER(18,2)           NOT NULL,
+  MONTO_CASHBACK         NUMBER(18,2),
+  MONTO_DISPONIBLE       NUMBER(18,2),
+  NUMERO_TARJETA         VARCHAR2(20 BYTE),
+  FECHA_EXP              CHAR(4 BYTE),
+  TRACK1                 VARCHAR2(100 BYTE) ENCRYPT USING 'AES256' SALT,
+  TRACK2                 VARCHAR2(40 BYTE) ENCRYPT USING 'AES256' SALT,
+  CODIGO_SEGURIDAD       VARCHAR2(4 BYTE) ENCRYPT USING 'AES256' SALT,
+  MODO_ENTRADA           CHAR(2 BYTE)           NOT NULL,
+  ESTADO                 CHAR(1 BYTE)           NOT NULL,
+  REF_TRANS_SIGTE        VARCHAR2(16 BYTE),
+  REF_TRANS_PREVIA       VARCHAR2(16 BYTE),
+  NUM_CONTROL_PREVIO     VARCHAR2(30 BYTE),
+  LOTE                   VARCHAR2(30 BYTE),
+  PROMO_TIPO_PLAN        NUMBER(2),
+  PROMO_NUM_PAGOS        NUMBER(2),
+  PROMO_MESES_DIF        NUMBER(2),
+  IND_QPS                CHAR(1 BYTE)           NOT NULL,
+  IND_ECI                CHAR(1 BYTE),
+  XID                    VARCHAR2(100 BYTE),
+  CAVV                   VARCHAR2(100 BYTE),
+  COD_RESULT_AUT         VARCHAR2(5 BYTE),
+  COD_RESULT_PAYW        CHAR(1 BYTE),
+  CODIGO_AUTORIZACION    VARCHAR2(10 BYTE),
+  CODIGO_ERROR_PAYW      VARCHAR2(30 BYTE),
+  TEXTO_ADICIONAL        VARCHAR2(200 BYTE),
+  BANCO_EMISOR           VARCHAR2(20 BYTE),
+  MARCA_TARJETA          VARCHAR2(20 BYTE),
+  TIPO_TARJETA           VARCHAR2(20 BYTE),
+  ID_CYBERSOURCE         VARCHAR2(40 BYTE),
+  IND_PAGO_MOVIL         CHAR(1 BYTE)           DEFAULT '0'                   NOT NULL,
+  TOKEN_B2               VARCHAR2(200 BYTE),
+  TOKEN_B3               VARCHAR2(100 BYTE),
+  TOKEN_B4               VARCHAR2(50 BYTE),
+  TAG_5A                 VARCHAR2(20 BYTE),
+  SUB_AFILIACION         VARCHAR2(30 BYTE)      DEFAULT null,
+  ID_AGREGADOR           VARCHAR2(19 BYTE)      DEFAULT NULL,
+  TAG_9F34               VARCHAR2(10 BYTE),
+  URL_RESPUESTA          VARCHAR2(200 BYTE),
+  TOKEN_20               VARCHAR2(50 BYTE),
+  TOKEN_CH               VARCHAR2(50 BYTE),
+  TOKEN_SE               VARCHAR2(200 BYTE),
+  FECHA_CIERRE           DATE,
+  EVT                    NUMBER(1),
+  PRM_RESULTADO          CHAR(1 BYTE),
+  RESPUESTA_ENVIADA_PRM  NUMBER(1)              DEFAULT 0                     NOT NULL,
+  FECHA_REFERIDA         DATE,
+  FECHA_ACEPT_REFER      DATE,
+  ARCHIVO_ENVIO_PRM      VARCHAR2(50 BYTE),
+  REGLA_APLICADA_PRM     NUMBER(10)             DEFAULT 0                     NOT NULL,
+  RESIDUO                NUMBER Generated Always as (MOD(TO_NUMBER("REFERENCIA"),4))
+) 
+NOCOMPRESS 
+TABLESPACE NPAYW_DATA
+PCTUSED    0
+PCTFREE    10
+INITRANS   50
+MAXTRANS   255
+STORAGE    (
+            INITIAL          50M
+            BUFFER_POOL      DEFAULT
+           )
+PARTITION BY RANGE (FECHA_RECEP_CTE)
+INTERVAL( NUMTODSINTERVAL(7,'DAY'))
+SUBPARTITION BY LIST (RESIDUO)
+SUBPARTITION TEMPLATE
+  (SUBPARTITION SP01 VALUES(0) TABLESPACE NPAYW_DATA01,
+   SUBPARTITION SP02 VALUES(1) TABLESPACE NPAYW_DATA02,
+   SUBPARTITION SP03 VALUES(2) TABLESPACE NPAYW_DATA03,
+   SUBPARTITION SP04 VALUES(3) TABLESPACE NPAYW_DATA04
+   )   
+ (PARTITION VALUES LESS THAN (TIMESTAMP' 2018-11-22 00:00:00') TABLESPACE NPAYW_DATA)
+NOCACHE
+PARALLEL ( DEGREE 13 INSTANCES 1 )
+MONITORING
+ENABLE ROW MOVEMENT;
+;
+
+-- Inicio redefinicion
+
+BEGIN
+  DBMS_REDEFINITION.START_REDEF_TABLE('HLEBA750', 'TRANSACCIONES','TRANSACCIONES_INTERMIN',
+       null, dbms_redefinition.cons_use_pk);
+END;
+/
+
+-- Paso elementos dependientes automaticamente (tambien se puede hacer manual)
+
+DECLARE
+num_errors PLS_INTEGER;
+BEGIN
+  DBMS_REDEFINITION.COPY_TABLE_DEPENDENTS('HLEBA750', 'TRANSACCIONES','TRANSACCIONES_INTERMIN',
+   DBMS_REDEFINITION.CONS_ORIG_PARAMS, TRUE, TRUE, TRUE, TRUE, num_errors);
+END;
+/
+
+-- Reviso errores del pase de elementos dependientes
+
+select object_name, base_table_name, ddl_txt from
+         DBA_REDEFINITION_ERRORS;
+
+-- Como es en linea, la tabla original puede tener TX pendientes, para reducir el tiempo de finalizacion, puedo estar sincronizando manualmente (desde otra terminal)
+
+BEGIN 
+  DBMS_REDEFINITION.SYNC_INTERIM_TABLE('HLEBA750', 'TRANSACCIONES', 'TRANSACCIONES_INTERMIN');
+END;
+/
+
+-- Finalizo la redefinicion
+
+BEGIN
+  DBMS_REDEFINITION.FINISH_REDEF_TABLE('HLEBA750', 'TRANSACCIONES', 'TRANSACCIONES_INTERMIN');
+END;
+/
+
+-- Espero que cualquier longops asociada a la INTERMIN termine y puedo eliminar la tabla intermedia
+
+
+--- EN CASO DE FALLA
+exec dbms_redefinition.abort_redef_table('HLEBA750','TRANSACCIONES','TRANSACCIONES_INTERMIN');
+
+
+-- Doc: https://docs.oracle.com/html/E25494_01/tables007.htm
